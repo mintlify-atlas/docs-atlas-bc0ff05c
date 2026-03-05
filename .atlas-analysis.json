@@ -1,0 +1,87 @@
+{
+  "projectType": "saas",
+  "projectName": "Auth Dashboard",
+  "projectDescription": "A modern React dashboard application with authentication, user management, and internationalization support.",
+  "theme": "almond",
+  "primaryColor": "#fbc926",
+  "lightColor": "#8c73fa",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Get Started",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Setup",
+            "pages": [
+              "installation",
+              "configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Features",
+        "groups": [
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/user-management",
+              "features/settings"
+            ]
+          },
+          {
+            "group": "Localization",
+            "pages": [
+              "features/internationalization"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/architecture",
+              "development/state-management",
+              "development/routing"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "development/api-integration",
+              "development/components"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based authentication with secure token storage",
+    "User management with CRUD operations",
+    "Dark mode theme switching",
+    "Multi-language support (English/Spanish)",
+    "Protected route navigation",
+    "Responsive dashboard layout"
+  ],
+  "publicApiSurface": [
+    "loginRequest({ username, password })",
+    "useAuthStore.login(username, password)",
+    "useAuthStore.logout()",
+    "getUsers()",
+    "useSettingsStore.toggleTheme()",
+    "useSettingsStore.setLanguage(language)"
+  ]
+}
