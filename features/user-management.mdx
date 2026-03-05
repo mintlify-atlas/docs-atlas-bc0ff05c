@@ -551,6 +551,10 @@ export default Users;
   Updates an existing user in the store. Matches users by ID and replaces the entire user object.
 </ParamField>
 
+<ParamField path="getUserById" type="(id: number) => User | undefined">
+  Retrieves a single user from the store by their ID. Returns `undefined` if the user is not found. Useful for user detail pages and edit forms.
+</ParamField>
+
 ### `useUsersStore` State
 
 <ParamField path="users" type="User[]">
