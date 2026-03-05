@@ -1,0 +1,339 @@
+---
+title: Authentication System
+description: Comprehensive guide to the authentication system, including login, session management, and protected routes
+---
+
+## Overview
+
+The Auth Dashboard uses a JWT-based authentication system built with Zustand for state management and Axios for API communication. The authentication flow includes login, token storage, automatic token injection, and session persistence.
+
+## Authentication Architecture
+
+### Core Components
+
+The authentication system consists of four main parts:
+
+- **authService.ts**: API communication layer
+- **authStore.tsx**: Global state management with Zustand
+- **useAuth.ts**: Custom hook for accessing auth state
+- **ProtectedRoute.tsx**: Route guard component
+
+### Authentication Flow
+
+1. User submits credentials through the login form
+2. `loginRequest` sends credentials to the API endpoint
+3. Server responds with user data and access token
+4. Token is stored in localStorage and Zustand store
+5. User is redirected to the dashboard
+6. Token is automatically included in subsequent API requests
+
+## Implementation
+
+### Auth Service
+
+The auth service handles API communication for authentication operations.
+
+<CodeGroup>
+```typescript authService.ts
+import { api } from "../../services/api";
+import type { AuthUser } from "./types";
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export const loginRequest = async ({
+  username,
+  password
+}: LoginCredentials): Promise<AuthUser> => {
+  const { data } = await api.post("/auth/login", {
+    username,
+    password,
+    expiresInMins: 30,
+  });
+
+  return {
+    id: data.id,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    image: data.image,
+    token: data.accessToken,
+  };
+};
+```
+
+```typescript types.ts
+export interface AuthUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  image: string;
+  token: string;
+}
+
+export interface AuthState {
+  user: AuthUser | null;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+```
+</CodeGroup>
+
+### State Management
+
+The authentication store uses Zustand with persistence middleware to maintain sessions across browser refreshes.
+
+```typescript authStore.tsx
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { loginRequest } from "./authService";
+import type { AuthState } from "./types";
+
+export const useAuthStore = create<AuthState>()(\n  persist(
+    (set) => ({
+      user: null,
+      loading: false,
+
+      login: async (username, password) => {
+        try {
+          set({ loading: true });
+          const data = await loginRequest({ username, password });
+          set({ user: data, loading: false });
+          localStorage.setItem("token", data.token);
+        } catch (error) {
+          set({ loading: false });
+          console.error(error);
+          alert("Credenciales incorrectas");
+        }
+      },
+
+      logout: () => {
+        localStorage.removeItem("token");
+        set({ user: null });
+      },
+    }),
+    {
+      name: "auth-storage",
+    }
+  )
+);
+```
+
+<Note>
+The persist middleware automatically saves the auth state to localStorage under the key `auth-storage`, ensuring users remain logged in after page refreshes.
+</Note>
+
+### Custom Hook
+
+Create a simple hook to access authentication state throughout your application:
+
+```typescript useAuth.ts
+import { useAuthStore } from "./authStore";
+
+export const useAuth = useAuthStore;
+```
+
+## Usage Examples
+
+### Login Form Implementation
+
+Here's how to implement a login form using the authentication system:
+
+```tsx Login.tsx
+import { useState } from "react";
+import { useAuthStore } from "../features/auth/authStore";
+import { useNavigate } from "react-router-dom";
+
+export default function Login() {
+  const login = useAuthStore((state) => state.login);
+  const loading = useAuthStore((state) => state.loading);
+  const navigate = useNavigate();
+
+  const [username, setUsername] = useState("emilys");
+  const [password, setPassword] = useState("emilyspass");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Execute login
+    await login(username, password);
+    
+    // Check if login was successful
+    if (useAuthStore.getState().user) {
+      navigate("/", { replace: true });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="Username"
+      />
+
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+      />
+
+      <button type="submit" disabled={loading}>
+        {loading ? "Loading..." : "Login"}
+      </button>
+    </form>
+  );
+}
+```
+
+### Protected Routes
+
+Implement route protection to restrict access to authenticated users:
+
+```tsx ProtectedRoute.tsx
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuthStore } from "../features/auth/authStore";
+
+const ProtectedRoute = () => {
+  const user = useAuthStore((state) => state.user);
+
+  return user ? <Outlet /> : <Navigate to="/login" replace />;
+};
+
+export default ProtectedRoute;
+```
+
+### Logout Implementation
+
+Implement logout functionality in any component:
+
+```tsx
+import { useAuthStore } from "../features/auth/authStore";
+import { useNavigate } from "react-router-dom";
+
+function LogoutButton() {
+  const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  return <button onClick={handleLogout}>Logout</button>;
+}
+```
+
+## API Integration
+
+### Axios Configuration
+
+The authentication system integrates with a configured Axios instance that automatically handles token injection and 401 responses.
+
+```typescript api.ts
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: "https://dummyjson.com",
+});
+
+// Request Interceptor - Inject token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+// Response Interceptor - Handle 401
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+<Warning>
+When a 401 Unauthorized response is received, the token is automatically removed from localStorage. You should implement additional logic to redirect users to the login page.
+</Warning>
+
+## Security Best Practices
+
+<Card title="Token Storage" icon="shield-check">
+Tokens are stored in localStorage for persistence. For enhanced security in production environments, consider using httpOnly cookies or secure session storage.
+</Card>
+
+<Card title="Token Expiration" icon="clock">
+The current implementation sets token expiration to 30 minutes (`expiresInMins: 30`). Implement token refresh logic for longer sessions.
+</Card>
+
+<Card title="Error Handling" icon="triangle-exclamation">
+Replace `alert()` calls with a proper toast notification system for better user experience. See the [Settings](/features/settings) page for toast implementation.
+</Card>
+
+## Accessing User Data
+
+Access the authenticated user's information in any component:
+
+```tsx
+import { useAuthStore } from "../features/auth/authStore";
+
+function UserProfile() {
+  const user = useAuthStore((state) => state.user);
+
+  if (!user) return null;
+
+  return (
+    <div>
+      <img src={user.image} alt={user.firstName} />
+      <h2>{user.firstName} {user.lastName}</h2>
+      <p>{user.email}</p>
+    </div>
+  );
+}
+```
+
+## API Reference
+
+### `useAuthStore` Methods
+
+<ParamField path="login" type="(username: string, password: string) => Promise<void>">
+  Authenticates a user with the provided credentials. Sets loading state during the request and stores the user data and token on success.
+</ParamField>
+
+<ParamField path="logout" type="() => void">
+  Logs out the current user by removing the token from localStorage and clearing the user state.
+</ParamField>
+
+### `useAuthStore` State
+
+<ParamField path="user" type="AuthUser | null">
+  The currently authenticated user object, or null if no user is logged in.
+</ParamField>
+
+<ParamField path="loading" type="boolean">
+  Indicates whether an authentication request is in progress.
+</ParamField>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Learn how to manage users in your application
+  </Card>
+  <Card title="Settings" icon="gear" href="/features/settings">
+    Configure application settings and preferences
+  </Card>
+</CardGroup>

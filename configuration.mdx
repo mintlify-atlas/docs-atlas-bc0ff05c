@@ -1,0 +1,471 @@
+---
+title: Configuration
+description: Configure Auth Dashboard with API endpoints, environment variables, and application settings
+---
+
+## Overview
+
+Auth Dashboard can be configured through various settings including API endpoints, authentication behavior, theming, and internationalization. This guide covers all configuration options available.
+
+## API Configuration
+
+The API client is configured in `src/services/api.ts` and handles all HTTP requests with automatic token management.
+
+### Base Configuration
+
+```typescript src/services/api.ts
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: "https://dummyjson.com",
+});
+```
+
+<Note>
+  By default, the dashboard uses DummyJSON API for demonstration. Replace this with your production API endpoint.
+</Note>
+
+### Change API Endpoint
+
+To use your own API, modify the `baseURL` in `src/services/api.ts`:
+
+```typescript
+export const api = axios.create({
+  baseURL: process.env.VITE_API_URL || "https://api.yourdomain.com",
+});
+```
+
+Then create a `.env` file in the project root:
+
+```bash .env
+VITE_API_URL=https://api.yourdomain.com
+```
+
+<Warning>
+  Vite requires environment variables to be prefixed with `VITE_` to be exposed to client-side code.
+</Warning>
+
+### Request Interceptor
+
+The API client automatically injects JWT tokens into all requests:
+
+```typescript src/services/api.ts
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+});
+```
+
+This interceptor:
+- Retrieves the token from localStorage
+- Adds it to the Authorization header
+- Runs before every API request
+
+### Response Interceptor
+
+Automatic error handling for expired tokens:
+
+```typescript src/services/api.ts
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      // User will be redirected to login by ProtectedRoute
+    }
+    
+    return Promise.reject(error);
+  }
+);
+```
+
+When a 401 response is received:
+1. Token is removed from localStorage
+2. User state is cleared by Zustand
+3. `ProtectedRoute` redirects to login page
+
+## Authentication Configuration
+
+### Token Storage
+
+Tokens are stored in localStorage by default. You can customize this in the auth store:
+
+```typescript src/features/auth/authStore.tsx
+login: async (username, password) => {
+  const data = await loginRequest({ username, password });
+  set({ user: data, loading: false });
+  
+  // Store token in localStorage
+  localStorage.setItem("token", data.token);
+}
+```
+
+<Tip>
+  For enhanced security in production, consider using httpOnly cookies instead of localStorage.
+</Tip>
+
+### Session Persistence
+
+Zustand persist middleware maintains user sessions across page refreshes:
+
+```typescript src/features/auth/authStore.tsx
+export const useAuthStore = create<AuthState>()()
+  persist(
+    (set) => ({ /* store implementation */ }),
+    {
+      name: "auth-storage", // localStorage key
+    }
+  )
+);
+```
+
+### Customize Session Key
+
+Change the localStorage key for auth state:
+
+```typescript
+persist(
+  (set) => ({ /* store implementation */ }),
+  {
+    name: "my-app-auth", // Custom key name
+  }
+)
+```
+
+### Token Expiration
+
+The login request includes a token expiration parameter:
+
+```typescript src/features/auth/authService.ts
+export const loginRequest = async ({ username, password }) => {
+  const { data } = await api.post("/auth/login", {
+    username,
+    password,
+    expiresInMins: 30, // Token expires in 30 minutes
+  });
+  
+  return {
+    id: data.id,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    image: data.image,
+    token: data.accessToken,
+  };
+};
+```
+
+Adjust `expiresInMins` based on your security requirements.
+
+## Route Configuration
+
+Routes are defined in `src/app/router.tsx` using React Router v7:
+
+```typescript src/app/router.tsx
+import { createBrowserRouter } from "react-router-dom";
+
+export const router = createBrowserRouter([
+  {
+    element: <PublicRoute />,
+    children: [
+      { path: "/login", element: <Login /> }
+    ],
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: "/",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <Dashboard /> },
+          { path: "users", element: <Users /> },
+          { path: "users/:id", element: <UserDetails /> },
+          { path: "settings", element: <Settings /> },
+        ],
+      },
+    ],
+  },
+]);
+```
+
+### Add New Routes
+
+To add a new protected route:
+
+```typescript
+{
+  element: <ProtectedRoute />,
+  children: [
+    {
+      path: "/",
+      element: <DashboardLayout />,
+      children: [
+        // ... existing routes
+        { path: "analytics", element: <Analytics /> },
+      ],
+    },
+  ],
+}
+```
+
+### Custom Redirect Path
+
+Modify the redirect path in `ProtectedRoute`:
+
+```typescript src/app/ProtectedRoute.tsx
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuthStore } from "../features/auth/authStore";
+
+const ProtectedRoute = () => {
+  const user = useAuthStore((state) => state.user);
+  return user ? <Outlet /> : <Navigate to="/auth/login" replace />;
+};
+```
+
+## Internationalization
+
+The dashboard supports multiple languages using i18next.
+
+### Available Languages
+
+- English (`en`)
+- Spanish (`es`)
+
+### i18n Configuration
+
+Locale files are located in `src/i18n/`:
+
+```
+src/i18n/
+├── index.ts      # i18n configuration
+├── en.json       # English translations
+└── es.json       # Spanish translations
+```
+
+### Change Default Language
+
+Modify the language in settings store or create an environment variable:
+
+```bash .env
+VITE_DEFAULT_LANGUAGE=es
+```
+
+### Add New Language
+
+<Steps>
+  <Step title="Create Translation File">
+    Create a new JSON file in `src/i18n/`:
+    ```json src/i18n/fr.json
+    {
+      "common": {
+        "login": "Connexion",
+        "logout": "Déconnexion"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Register Language">
+    Import and register in `src/i18n/index.ts`:
+    ```typescript
+    import fr from './fr.json';
+    
+    i18n.use(initReactI18next).init({
+      resources: {
+        en: { translation: en },
+        es: { translation: es },
+        fr: { translation: fr },
+      },
+      lng: 'en',
+      fallbackLng: 'en',
+    });
+    ```
+  </Step>
+</Steps>
+
+## Theme Configuration
+
+The dashboard supports light and dark themes managed through the settings store.
+
+### Theme Initialization
+
+Theme is applied in `src/AppInitializer.tsx`:
+
+```tsx src/AppInitializer.tsx
+import { useEffect } from "react";
+import { useSettingsStore } from "./shared/store/useSettingsStore";
+
+export const AppInitializer = () => {
+  const theme = useSettingsStore((store) => store.theme);
+  
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+  
+  return null;
+};
+```
+
+### Set Default Theme
+
+Configure the default theme in your settings store:
+
+```typescript
+const useSettingsStore = create()()
+  persist(
+    (set) => ({
+      theme: "light", // or "dark"
+      language: "en",
+    }),
+    { name: "settings-storage" }
+  )
+);
+```
+
+## Environment Variables
+
+Create a `.env` file for environment-specific configuration:
+
+```bash .env
+# API Configuration
+VITE_API_URL=https://api.yourdomain.com
+VITE_API_TIMEOUT=10000
+
+# Authentication
+VITE_TOKEN_EXPIRY=30
+VITE_SESSION_KEY=auth-storage
+
+# Application
+VITE_DEFAULT_LANGUAGE=en
+VITE_DEFAULT_THEME=light
+
+# Feature Flags
+VITE_ENABLE_ANALYTICS=true
+VITE_ENABLE_I18N=true
+```
+
+<Warning>
+  Never commit `.env` files with sensitive data to version control. Use `.env.example` for templates.
+</Warning>
+
+### Environment-Specific Files
+
+```bash
+.env                # Loaded in all cases
+.env.local          # Loaded in all cases, ignored by git
+.env.development    # Loaded in development mode
+.env.production     # Loaded in production mode
+```
+
+## Build Configuration
+
+### Vite Configuration
+
+```typescript vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    open: true,
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+  },
+})
+```
+
+### Custom Port
+
+```typescript vite.config.ts
+export default defineConfig({
+  server: {
+    port: 3000,
+  },
+})
+```
+
+## TypeScript Configuration
+
+The project uses TypeScript with strict mode enabled:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="shield">
+    - Never commit sensitive data
+    - Use environment variables
+    - Implement HTTPS in production
+    - Rotate tokens regularly
+  </Card>
+  
+  <Card title="Performance" icon="gauge">
+    - Enable source maps only in dev
+    - Use code splitting
+    - Optimize bundle size
+    - Cache static assets
+  </Card>
+  
+  <Card title="Maintainability" icon="wrench">
+    - Document configuration changes
+    - Use TypeScript for type safety
+    - Follow naming conventions
+    - Keep dependencies updated
+  </Card>
+  
+  <Card title="Testing" icon="flask">
+    - Test with production config
+    - Validate environment variables
+    - Test different locales
+    - Test authentication flows
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/features/authentication">
+    Learn about authentication implementation details
+  </Card>
+  <Card title="API Integration" icon="plug" href="/development/api-integration">
+    Integrate with your backend API
+  </Card>
+  <Card title="State Management" icon="database" href="/development/state-management">
+    Understand state management with Zustand
+  </Card>
+  <Card title="Components" icon="cube" href="/development/components">
+    Explore the shared component library
+  </Card>
+</CardGroup>

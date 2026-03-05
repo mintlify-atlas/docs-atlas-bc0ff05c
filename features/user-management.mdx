@@ -1,0 +1,599 @@
+---
+title: User Management
+description: Complete guide to managing users including CRUD operations, search, pagination, and real-time updates
+---
+
+## Overview
+
+The User Management system provides a complete solution for managing user records with features including listing, searching, filtering, creating, updating, and deleting users. The system uses Zustand for state management and supports real-time UI updates.
+
+## Architecture
+
+### Core Components
+
+- **usersService.ts**: API communication layer for user operations
+- **usersStore.ts**: Centralized state management with Zustand
+- **AddUserForm.tsx**: Form component for creating and editing users
+- **ConfirmDeleteModal.tsx**: Confirmation dialog for deletions
+- **Users.tsx**: Main users list page with search and pagination
+
+## Data Models
+
+### User Type
+
+The User interface defines the structure of user objects throughout the application:
+
+```typescript types.ts
+export interface User {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  age: number;
+  username: string;
+  image: string;
+  password?: string;
+  token?: string;
+}
+```
+
+## State Management
+
+### Users Store
+
+The users store manages all user-related state and operations:
+
+```typescript usersStore.ts
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { getUsers } from "./usersService";
+import type { User } from "./types";
+
+interface UsersState {
+  users: User[];
+  loading: boolean;
+  error: string | null;
+  deletingId: number | null;
+
+  fetchUsers: () => Promise<void>;
+  addUser: (user: User) => void;
+  deleteUser: (id: number) => void;
+  updateUser: (user: User) => void;
+}
+
+export const useUsersStore = create<UsersState>()(\n  persist(
+    (set, get) => ({
+      users: [],
+      loading: false,
+      error: null,
+      deletingId: null,
+
+      fetchUsers: async () => {
+        if (get().users.length > 0) return;
+
+        try {
+          set({ loading: true, error: null });
+          const usersFromApi = await getUsers();
+          set({ users: usersFromApi, loading: false });
+        } catch {
+          set({ error: "Error fetching users", loading: false });
+        }
+      },
+
+      addUser: (user) =>
+        set((state) => ({
+          users: [user, ...state.users],
+        })),
+
+      deleteUser: (id) => {
+        set({ deletingId: id });
+        set((state) => ({
+          users: state.users.filter((user) => user.id !== id),
+          deletingId: null,
+        }));
+      },
+
+      updateUser: (updatedUser: User) =>
+        set((state) => ({
+          users: state.users.map((user) =>
+            user.id === updatedUser.id ? updatedUser : user
+          ),
+        })),
+    }),
+    {
+      name: "users-storage",
+    }
+  )
+);
+```
+
+<Note>
+The `fetchUsers` method includes a check to prevent redundant API calls if users are already loaded. This optimization improves performance and reduces unnecessary network requests.
+</Note>
+
+### API Service
+
+The users service handles API communication:
+
+```typescript usersService.ts
+import { api } from "../../services/api";
+import type { User } from "./types";
+
+interface UsersResponse {
+  users: User[];
+}
+
+export const getUsers = async (): Promise<User[]> => {
+  const { data } = await api.get<UsersResponse>("/users");
+  return data.users;
+};
+```
+
+## User Operations
+
+### Fetching Users
+
+Load users from the API when your component mounts:
+
+```tsx
+import { useEffect } from "react";
+import { useUsersStore } from "../../features/users/usersStore";
+
+function UsersList() {
+  const { users, loading, error, fetchUsers } = useUsersStore();
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>
+          {user.firstName} {user.lastName}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Creating Users
+
+The user form component handles both creation and editing:
+
+```tsx AddUserForm.tsx
+import { useState } from "react";
+import { useUsersStore } from "../usersStore";
+import { useToastStore } from "../../../shared/store/useToastStore";
+import type { User } from "../types";
+import { useTranslation } from "react-i18next";
+
+interface Props {
+  onClose: () => void;
+  user?: User;
+}
+
+export const UserForm = ({ onClose, user }: Props) => {
+  const addUser = useUsersStore((state) => state.addUser);
+  const updateUser = useUsersStore((state) => state.updateUser);
+  const showToast = useToastStore((state) => state.show);
+  const { t } = useTranslation();
+
+  const isEditMode = !!user;
+
+  const [form, setForm] = useState({
+    firstName: user?.firstName ?? "",
+    lastName: user?.lastName ?? "",
+    email: user?.email ?? "",
+    age: user?.age?.toString() ?? "",
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const ageNumber = Number(form.age);
+    if (isNaN(ageNumber)) return;
+
+    if (isEditMode && user) {
+      updateUser({
+        ...user,
+        ...form,
+        age: ageNumber,
+      });
+      showToast(t("success"));
+    } else {
+      addUser({
+        id: Date.now() + Math.random(),
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        age: ageNumber,
+        username: form.firstName.toLowerCase(),
+        image: "https://i.pravatar.cc/150",
+      });
+      showToast(t("created"));
+    }
+
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        name="firstName"
+        value={form.firstName}
+        onChange={handleChange}
+        placeholder={t("name")}
+        required
+      />
+      <input
+        name="lastName"
+        value={form.lastName}
+        onChange={handleChange}
+        placeholder={t("lastname")}
+        required
+      />
+      <input
+        name="email"
+        type="email"
+        value={form.email}
+        onChange={handleChange}
+        placeholder={t("email")}
+        required
+      />
+      <input
+        name="age"
+        type="number"
+        value={form.age}
+        onChange={handleChange}
+        placeholder={t("age")}
+        required
+      />
+      <button type="submit">
+        {isEditMode ? t("update") : t("save")}
+      </button>
+    </form>
+  );
+};
+```
+
+<Tip>
+The form component intelligently switches between create and edit modes based on whether a `user` prop is provided. This reduces code duplication and maintains consistency.
+</Tip>
+
+### Updating Users
+
+Update an existing user by passing the user object to the form:
+
+```tsx
+import { useState } from "react";
+import { UserForm } from "../features/users/components/AddUserForm";
+import { Modal } from "../shared/components/Modal";
+import type { User } from "../features/users/types";
+
+function EditUserExample() {
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleEdit = (user: User) => {
+    setSelectedUser(user);
+    setIsOpen(true);
+  };
+
+  return (
+    <>
+      <button onClick={() => handleEdit(someUser)}>Edit User</button>
+      
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+        <UserForm
+          onClose={() => setIsOpen(false)}
+          user={selectedUser || undefined}
+        />
+      </Modal>
+    </>
+  );
+}
+```
+
+### Deleting Users
+
+Implement user deletion with confirmation:
+
+```tsx
+import { useUsersStore } from "../features/users/usersStore";
+import { useToastStore } from "../shared/store/useToastStore";
+import type { User } from "../features/users/types";
+
+function DeleteUserButton({ user }: { user: User }) {
+  const deleteUser = useUsersStore((state) => state.deleteUser);
+  const showToast = useToastStore((state) => state.show);
+
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete ${user.firstName}?`)) {
+      deleteUser(user.id);
+      showToast("User deleted successfully");
+    }
+  };
+
+  return (
+    <button onClick={handleDelete} className="text-red-600">
+      Delete
+    </button>
+  );
+}
+```
+
+## Advanced Features
+
+### Search and Filter
+
+Implement real-time search across multiple user fields:
+
+```tsx
+import { useMemo, useState } from "react";
+import { useUsersStore } from "../features/users/usersStore";
+
+function UsersWithSearch() {
+  const users = useUsersStore((state) => state.users);
+  const [search, setSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) =>
+      `${user.firstName} ${user.lastName} ${user.email} ${user.username}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
+  }, [users, search]);
+
+  return (
+    <>
+      <input
+        type="text"
+        placeholder="Search users..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      
+      <ul>
+        {filteredUsers.map((user) => (
+          <li key={user.id}>{user.firstName} {user.lastName}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+```
+
+<Note>
+The `useMemo` hook ensures the filter operation only runs when `users` or `search` changes, preventing unnecessary re-computations.
+</Note>
+
+### Pagination
+
+Implement client-side pagination for large user lists:
+
+```tsx
+import { useState } from "react";
+import { useUsersStore } from "../features/users/usersStore";
+
+function PaginatedUsers() {
+  const users = useUsersStore((state) => state.users);
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 6;
+
+  const totalPages = Math.ceil(users.length / usersPerPage);
+  
+  const paginatedUsers = users.slice(
+    (currentPage - 1) * usersPerPage,
+    currentPage * usersPerPage
+  );
+
+  return (
+    <>
+      <ul>
+        {paginatedUsers.map((user) => (
+          <li key={user.id}>{user.firstName} {user.lastName}</li>
+        ))}
+      </ul>
+
+      <div>
+        <button
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage(currentPage - 1)}
+        >
+          Previous
+        </button>
+        
+        <span>{currentPage} / {totalPages}</span>
+        
+        <button
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(currentPage + 1)}
+        >
+          Next
+        </button>
+      </div>
+    </>
+  );
+}
+```
+
+### Complete Users Page
+
+The full implementation combines all features:
+
+```tsx Users.tsx
+import { useEffect, useMemo, useState } from "react";
+import { useUsersStore } from "../../features/users/usersStore";
+import { UserForm } from "../../features/users/components/AddUserForm";
+import { Modal } from "../../shared/components/Modal";
+import { Link } from "react-router-dom";
+import type { User } from "../../features/users/types";
+
+const Users = () => {
+  const { users, loading, error, fetchUsers } = useUsersStore();
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const usersPerPage = 6;
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) =>
+      `${user.firstName} ${user.lastName} ${user.email} ${user.username}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
+  }, [users, search]);
+
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * usersPerPage,
+    currentPage * usersPerPage
+  );
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      <h1>Users ({users.length} total)</h1>
+      
+      <div>
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setCurrentPage(1); // Reset to first page
+          }}
+        />
+        
+        <button onClick={() => {
+          setSelectedUser(null);
+          setIsOpen(true);
+        }}>
+          Add User
+        </button>
+      </div>
+
+      <table>
+        <tbody>
+          {paginatedUsers.map((user) => (
+            <tr key={user.id}>
+              <td>
+                <img src={user.image} alt="" />
+                <Link to={`/users/${user.id}`}>
+                  {user.firstName} {user.lastName}
+                </Link>
+              </td>
+              <td>{user.email}</td>
+              <td>{user.age}</td>
+              <td>@{user.username}</td>
+              <td>
+                <button onClick={() => {
+                  setSelectedUser(user);
+                  setIsOpen(true);
+                }}>
+                  Edit
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+        <UserForm
+          onClose={() => setIsOpen(false)}
+          user={selectedUser || undefined}
+        />
+      </Modal>
+    </div>
+  );
+};
+
+export default Users;
+```
+
+## API Reference
+
+### `useUsersStore` Methods
+
+<ParamField path="fetchUsers" type="() => Promise<void>">
+  Fetches users from the API. Includes built-in caching to prevent redundant requests if users are already loaded.
+</ParamField>
+
+<ParamField path="addUser" type="(user: User) => void">
+  Adds a new user to the beginning of the users array. Updates the state immediately for optimistic UI updates.
+</ParamField>
+
+<ParamField path="deleteUser" type="(id: number) => void">
+  Removes a user from the store by ID. Sets `deletingId` temporarily to show loading states.
+</ParamField>
+
+<ParamField path="updateUser" type="(user: User) => void">
+  Updates an existing user in the store. Matches users by ID and replaces the entire user object.
+</ParamField>
+
+### `useUsersStore` State
+
+<ParamField path="users" type="User[]">
+  Array of all users in the application.
+</ParamField>
+
+<ParamField path="loading" type="boolean">
+  Indicates whether users are currently being fetched from the API.
+</ParamField>
+
+<ParamField path="error" type="string | null">
+  Contains error message if the fetch operation failed, otherwise null.
+</ParamField>
+
+<ParamField path="deletingId" type="number | null">
+  The ID of the user currently being deleted, useful for showing loading spinners on delete buttons.
+</ParamField>
+
+## Best Practices
+
+<Card title="Optimistic Updates" icon="bolt">
+  The store performs optimistic updates for better UX. Operations like add, update, and delete immediately update the UI without waiting for server confirmation.
+</Card>
+
+<Card title="State Persistence" icon="database">
+  User data is persisted to localStorage via Zustand's persist middleware, reducing API calls and improving load times.
+</Card>
+
+<Card title="Form Validation" icon="shield-check">
+  Always validate form inputs before submission. The example uses HTML5 validation (`required`, `type="email"`), but consider adding custom validation for production.
+</Card>
+
+<Warning>
+The current implementation generates user IDs using `Date.now() + Math.random()`. In production, user IDs should be generated by your backend API to ensure uniqueness across all clients.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/features/authentication">
+    Learn about the authentication system
+  </Card>
+  <Card title="Internationalization" icon="globe" href="/features/internationalization">
+    Add multi-language support to your user interface
+  </Card>
+</CardGroup>

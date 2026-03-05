@@ -1,0 +1,608 @@
+---
+title: API Integration
+description: Learn how to integrate with external APIs using axios, interceptors, and service patterns
+---
+
+## Overview
+
+The Auth Dashboard uses [axios](https://axios-http.com/) for HTTP requests with a centralized configuration, request/response interceptors, and a service layer pattern.
+
+<Info>
+All API calls go through a configured axios instance that automatically handles authentication, error responses, and base URL configuration.
+</Info>
+
+## API Client Setup
+
+The main API client is configured in `src/services/api.ts:3-32`:
+
+```typescript
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: "https://dummyjson.com",
+});
+
+/* =========================
+   REQUEST INTERCEPTOR
+========================= */
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+/* =========================
+   RESPONSE INTERCEPTOR
+========================= */
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+    }
+
+    return Promise.reject(error);
+  },
+);
+```
+
+### Key Features
+
+<CardGroup cols={2}>
+  <Card title="Base URL" icon="globe">
+    Centralized base URL configuration. Change once to affect all API calls.
+  </Card>
+  <Card title="Auto Authentication" icon="key">
+    Automatically attaches JWT tokens to every request.
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Intercepts 401 errors and clears authentication state.
+  </Card>
+  <Card title="Request/Response Hooks" icon="arrows-spin">
+    Modify requests and responses globally before they reach components.
+  </Card>
+</CardGroup>
+
+## Request Interceptor
+
+The request interceptor runs before every API call:
+
+```typescript
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+```
+
+<Steps>
+  <Step title="Retrieve token">
+    Reads the JWT token from localStorage
+  </Step>
+  <Step title="Add authorization header">
+    If token exists, adds it to the `Authorization` header as a Bearer token
+  </Step>
+  <Step title="Return modified config">
+    Returns the modified config for the request to proceed
+  </Step>
+</Steps>
+
+<Note>
+The interceptor automatically handles token injection, so you never need to manually add authorization headers in your API calls.
+</Note>
+
+## Response Interceptor
+
+The response interceptor handles errors globally:
+
+```typescript
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+    }
+
+    return Promise.reject(error);
+  },
+);
+```
+
+**Behavior:**
+- **Success responses** - Pass through unchanged
+- **401 Unauthorized** - Removes token from localStorage (triggers logout)
+- **Other errors** - Propagates to the calling code for handling
+
+<Warning>
+The interceptor only clears the token from localStorage. The Zustand store will detect this on next page load through persistence. For immediate logout UI updates, you should also call the store's `logout()` method.
+</Warning>
+
+## Service Layer Pattern
+
+Each feature has its own service file that wraps API calls:
+
+### Authentication Service
+
+`features/auth/authService.ts:9-24`:
+
+```typescript
+import { api } from "../../services/api";
+import type { AuthUser } from "./types";
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export const loginRequest = async ({
+  username,
+  password
+}: LoginCredentials): Promise<AuthUser> => {
+  const { data } = await api.post("/auth/login", {
+    username,
+    password,
+    expiresInMins: 30,
+  });
+
+  return {
+    id: data.id,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    image: data.image,
+    token: data.accessToken,
+  };
+};
+```
+
+**Service responsibilities:**
+- Make HTTP request using the configured `api` instance
+- Transform API response to match application types
+- Extract only needed data
+- Return typed data for use in stores
+
+### Users Service
+
+`features/users/usersService.ts:8-11`:
+
+```typescript
+import { api } from "../../services/api";
+import type { User } from "./types";
+
+interface UsersResponse {
+  users: User[];
+}
+
+export const getUsers = async (): Promise<User[]> => {
+  const { data } = await api.get<UsersResponse>("/users");
+  return data.users;
+};
+```
+
+<Accordion title="Why extract data.users?">
+The DummyJSON API returns `{ users: [...] }`, but the application only needs the array. The service extracts and returns just the `users` array, simplifying usage in components and stores.
+</Accordion>
+
+## Type-Safe API Calls
+
+Use TypeScript generics for type-safe responses:
+
+```typescript
+interface UsersResponse {
+  users: User[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export const getUsers = async (): Promise<User[]> => {
+  // Axios will type 'data' as UsersResponse
+  const { data } = await api.get<UsersResponse>("/users");
+  return data.users;
+};
+```
+
+## Service Patterns
+
+### GET Request
+
+```typescript
+export const getUser = async (id: number): Promise<User> => {
+  const { data } = await api.get<User>(`/users/${id}`);
+  return data;
+};
+```
+
+### POST Request
+
+```typescript
+interface CreateUserPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export const createUser = async (payload: CreateUserPayload): Promise<User> => {
+  const { data } = await api.post<User>("/users/add", payload);
+  return data;
+};
+```
+
+### PUT/PATCH Request
+
+```typescript
+export const updateUser = async (
+  id: number,
+  updates: Partial<User>
+): Promise<User> => {
+  const { data } = await api.put<User>(`/users/${id}`, updates);
+  return data;
+};
+```
+
+### DELETE Request
+
+```typescript
+export const deleteUser = async (id: number): Promise<void> => {
+  await api.delete(`/users/${id}`);
+};
+```
+
+## Error Handling
+
+### In Services
+
+Let errors propagate to the calling code:
+
+```typescript
+// ✅ Let errors bubble up
+export const getUsers = async (): Promise<User[]> => {
+  const { data } = await api.get<UsersResponse>("/users");
+  return data.users;
+};
+
+// ❌ Don't catch errors in services
+export const getUsers = async (): Promise<User[]> => {
+  try {
+    const { data } = await api.get<UsersResponse>("/users");
+    return data.users;
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
+```
+
+### In Stores
+
+Handle errors in Zustand stores:
+
+```typescript
+fetchUsers: async () => {
+  try {
+    set({ loading: true, error: null });
+    const usersFromApi = await getUsers();
+    set({ users: usersFromApi, loading: false });
+  } catch (error) {
+    set({ 
+      error: error instanceof Error ? error.message : "Error fetching users",
+      loading: false 
+    });
+  }
+}
+```
+
+### In Components
+
+Display error states from the store:
+
+```tsx
+function UserList() {
+  const users = useUsersStore((state) => state.users);
+  const loading = useUsersStore((state) => state.loading);
+  const error = useUsersStore((state) => state.error);
+  const fetchUsers = useUsersStore((state) => state.fetchUsers);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      {users.map(user => <UserCard key={user.id} user={user} />)}
+    </div>
+  );
+}
+```
+
+## Advanced Patterns
+
+### Request Cancellation
+
+Cancel requests when components unmount:
+
+```typescript
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+function SearchUsers() {
+  const [results, setResults] = useState([]);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const source = axios.CancelToken.source();
+
+    const search = async () => {
+      try {
+        const { data } = await api.get(`/users/search?q=${query}`, {
+          cancelToken: source.token,
+        });
+        setResults(data.users);
+      } catch (error) {
+        if (axios.isCancel(error)) {
+          console.log("Request canceled");
+        }
+      }
+    };
+
+    if (query) search();
+
+    return () => source.cancel();
+  }, [query]);
+
+  return <div>{/* render results */}</div>;
+}
+```
+
+### Request Retry
+
+Retry failed requests automatically:
+
+```typescript
+import axios from "axios";
+import axiosRetry from "axios-retry";
+
+// Configure retry behavior
+axiosRetry(api, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return (
+      axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+      error.response?.status === 429
+    );
+  },
+});
+```
+
+### Request Debouncing
+
+Debounce search or filter requests:
+
+```typescript
+import { useState, useEffect } from "react";
+import { useDebounce } from "use-debounce";
+
+function SearchUsers() {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery] = useDebounce(query, 500);
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    if (debouncedQuery) {
+      api.get(`/users/search?q=${debouncedQuery}`)
+        .then(({ data }) => setResults(data.users));
+    }
+  }, [debouncedQuery]);
+
+  return (
+    <input
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Search users..."
+    />
+  );
+}
+```
+
+### File Upload
+
+```typescript
+export const uploadAvatar = async (
+  userId: number,
+  file: File
+): Promise<string> => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const { data } = await api.post<{ url: string }>(
+    `/users/${userId}/avatar`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+
+  return data.url;
+};
+```
+
+## Environment Configuration
+
+### Multiple Environments
+
+Use environment variables for different API URLs:
+
+```typescript
+// src/services/api.ts
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || "https://dummyjson.com",
+});
+```
+
+```bash
+# .env.development
+VITE_API_BASE_URL=http://localhost:3000/api
+
+# .env.production
+VITE_API_BASE_URL=https://api.production.com
+```
+
+### Multiple API Instances
+
+Create separate axios instances for different APIs:
+
+```typescript
+// src/services/api.ts
+import axios from "axios";
+
+export const mainApi = axios.create({
+  baseURL: "https://api.example.com",
+});
+
+export const analyticsApi = axios.create({
+  baseURL: "https://analytics.example.com",
+});
+
+// Configure interceptors for each
+mainApi.interceptors.request.use(/* ... */);
+analyticsApi.interceptors.request.use(/* ... */);
+```
+
+## Testing API Services
+
+Mock axios for testing:
+
+```typescript
+import { vi } from "vitest";
+import { getUsers } from "./usersService";
+import { api } from "../../services/api";
+
+vi.mock("../../services/api");
+
+describe("getUsers", () => {
+  it("should fetch and return users", async () => {
+    const mockUsers = [
+      { id: 1, firstName: "John", email: "john@example.com" },
+    ];
+
+    (api.get as any).mockResolvedValue({
+      data: { users: mockUsers },
+    });
+
+    const result = await getUsers();
+
+    expect(api.get).toHaveBeenCalledWith("/users");
+    expect(result).toEqual(mockUsers);
+  });
+
+  it("should handle errors", async () => {
+    (api.get as any).mockRejectedValue(new Error("Network error"));
+
+    await expect(getUsers()).rejects.toThrow("Network error");
+  });
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Centralized Config" icon="sitemap">
+    Always use the configured `api` instance, never create new axios instances ad-hoc.
+  </Card>
+  <Card title="Service Layer" icon="layer-group">
+    Wrap all API calls in service functions. Don't call `api` directly from components or stores.
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Use TypeScript generics for type-safe responses: `api.get<User>(...)`
+  </Card>
+  <Card title="Transform in Services" icon="shuffle">
+    Transform API responses in services, not in stores or components.
+  </Card>
+</CardGroup>
+
+### Do's and Don'ts
+
+<Tabs>
+  <Tab title="Do">
+    ```typescript
+    // ✅ Use the configured api instance
+    import { api } from "@/services/api";
+    
+    // ✅ Create service functions
+    export const getUsers = async () => {
+      const { data } = await api.get("/users");
+      return data.users;
+    };
+    
+    // ✅ Type your responses
+    const { data } = await api.get<User[]>("/users");
+    
+    // ✅ Let errors propagate from services
+    export const getUsers = async () => {
+      const { data } = await api.get("/users");
+      return data;
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Don't">
+    ```typescript
+    // ❌ Don't create new axios instances
+    import axios from "axios";
+    const { data } = await axios.get("https://api.com/users");
+    
+    // ❌ Don't call api directly in components
+    function UserList() {
+      useEffect(() => {
+        api.get("/users").then(/* ... */);
+      }, []);
+    }
+    
+    // ❌ Don't swallow errors in services
+    export const getUsers = async () => {
+      try {
+        return await api.get("/users");
+      } catch {
+        return [];
+      }
+    };
+    
+    // ❌ Don't transform data in components
+    const { data } = await api.get("/users");
+    const users = data.users; // Do this in service
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Learn how API integration fits into the architecture
+  </Card>
+  <Card title="State Management" icon="database" href="/development/state-management">
+    Use services in Zustand stores
+  </Card>
+  <Card title="Axios Docs" icon="book" href="https://axios-http.com/">
+    Official axios documentation
+  </Card>
+  <Card title="TypeScript" icon="code" href="https://www.typescriptlang.org/">
+    Learn more about TypeScript
+  </Card>
+</CardGroup>

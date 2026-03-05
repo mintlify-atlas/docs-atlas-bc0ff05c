@@ -1,0 +1,644 @@
+---
+title: Internationalization (i18n)
+description: Complete guide to implementing multi-language support using react-i18next with dynamic language switching
+---
+
+## Overview
+
+The Auth Dashboard implements internationalization (i18n) using react-i18next, providing seamless multi-language support. The system currently supports English and Spanish, with the ability to add more languages easily.
+
+## Architecture
+
+The i18n system consists of:
+
+- **i18n/index.ts**: Configuration and initialization
+- **i18n/en.json**: English translations
+- **i18n/es.json**: Spanish translations
+- **useSettingsStore**: Integration with application settings
+
+## Setup and Configuration
+
+### i18n Initialization
+
+The i18n system is configured with i18next and react-i18next:
+
+```typescript i18n/index.ts
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+
+import en from "./en.json";
+import es from "./es.json";
+
+i18n.use(initReactI18next).init({
+  resources: {
+    en: { translation: en },
+    es: { translation: es },
+  },
+  fallbackLng: "en",
+  interpolation: {
+    escapeValue: false,
+  },
+});
+
+export default i18n;
+```
+
+<Note>
+The `fallbackLng` is set to "en" (English), which means if a translation is missing in the selected language, the English translation will be used instead.
+</Note>
+
+### Translation Files
+
+Translations are stored in JSON files for each supported language:
+
+<Tabs>
+  <Tab title="English (en.json)">
+```json
+{
+  "dashboard": "Dashboard",
+  "users": "Users",
+  "settings": "Settings",
+  "language": "Language",
+  "darkMode": "Dark mode",
+  "totalUsers": "total users",
+  "userDetails": "User details",
+  "back": "Back",
+  "success": "User updated succesfully ✅",
+  "created": "User created successfully 🎉",
+  "edit": "Edit user",
+  "modify": "Edit",
+  "add": "Add user",
+  "name": "First Name",
+  "lastname": "Last Name",
+  "email": "Email",
+  "age": "Age",
+  "update": "Update user",
+  "save": "Save user",
+  "delete": "Delete user",
+  "confirmDel": "Are you sure you want to delete",
+  "cancel": "Cancel",
+  "del": "Delete",
+  "wellcome": "Wellcome",
+  "preferences": "Manage your preferences",
+  "successdel": "User deleted succesfully 🗑️",
+  "logout": "Logout",
+  "prev": "Prev",
+  "next": "Next",
+  "searchUser": "Search User...",
+  "search": "Search",
+  "username": "Username",
+  "password": "Password"
+}
+```
+  </Tab>
+  <Tab title="Spanish (es.json)">
+```json
+{
+  "dashboard": "Panel de control",
+  "users": "Usuarios",
+  "settings": "Configuración",
+  "language": "Idioma",
+  "darkMode": "Modo oscuro",
+  "totalUsers": "usuarios en total",
+  "userDetails": "Detalle de usuario",
+  "back": "Volver",
+  "success": "Usuario actualizado correctamente ✅",
+  "created": "Usuario creado correctamente 🎉",
+  "edit": "Editar usuario",
+  "modify": "Editar",
+  "add": "Agregar usuario",
+  "name": "Nombre",
+  "lastname": "Apellido",
+  "email": "Correo Electrónico",
+  "age": "edad",
+  "update": "Actualizar usuario",
+  "save": "Guardar usuario",
+  "delete": "Eliminar usuario",
+  "confirmDel": "Seguro que desea eliminar este usuario",
+  "cancel": "Cancelar",
+  "del": "Eliminar",
+  "wellcome": "Bienvenido(a)",
+  "preferences": "Configura a tu gusto",
+  "successdel": "Usuario eliminado correctamente 🗑️",
+  "logout": "Salir",
+  "prev": "Anterior",
+  "next": "Siguiente",
+  "searchUser": "Buscar usuario...",
+  "search": "Buscar",
+  "username": "Nombre de usuario",
+  "password": "contraseña"
+}
+```
+  </Tab>
+</Tabs>
+
+## Usage
+
+### Basic Translation
+
+Use the `useTranslation` hook to access translations in your components:
+
+```tsx
+import { useTranslation } from "react-i18next";
+
+function MyComponent() {
+  const { t } = useTranslation();
+
+  return (
+    <div>
+      <h1>{t("dashboard")}</h1>
+      <p>{t("wellcome")}</p>
+      <button>{t("logout")}</button>
+    </div>
+  );
+}
+```
+
+### Translating Form Labels
+
+Translate form inputs and placeholders:
+
+```tsx UserForm.tsx
+import { useTranslation } from "react-i18next";
+
+function UserForm() {
+  const { t } = useTranslation();
+
+  return (
+    <form>
+      <h2>{t("add")}</h2>
+      
+      <input
+        name="firstName"
+        placeholder={t("name")}
+        required
+      />
+      
+      <input
+        name="lastName"
+        placeholder={t("lastname")}
+        required
+      />
+      
+      <input
+        name="email"
+        type="email"
+        placeholder={t("email")}
+        required
+      />
+      
+      <input
+        name="age"
+        type="number"
+        placeholder={t("age")}
+        required
+      />
+      
+      <button type="submit">{t("save")}</button>
+    </form>
+  );
+}
+```
+
+### Dynamic Content Translation
+
+Translate dynamic content like counts and status messages:
+
+```tsx Users.tsx
+import { useTranslation } from "react-i18next";
+import { useUsersStore } from "../features/users/usersStore";
+
+function UsersPage() {
+  const { t } = useTranslation();
+  const users = useUsersStore((state) => state.users);
+
+  return (
+    <div>
+      <h1>{t("users")}</h1>
+      <p>{users.length} {t("totalUsers")}</p>
+      
+      <button>{t("add")}</button>
+    </div>
+  );
+}
+```
+
+### Conditional Translations
+
+Use different translation keys based on conditions:
+
+```tsx
+import { useTranslation } from "react-i18next";
+
+function UserFormModal({ user }: { user?: User }) {
+  const { t } = useTranslation();
+  const isEditMode = !!user;
+
+  return (
+    <div>
+      <h2>{isEditMode ? t("edit") : t("add")}</h2>
+      
+      <button type="submit">
+        {isEditMode ? t("update") : t("save")}
+      </button>
+    </div>
+  );
+}
+```
+
+## Language Switching
+
+### Integration with Settings
+
+The language setting is managed through the settings store and synchronized with i18n:
+
+```tsx App.tsx
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { useSettingsStore } from "./shared/store/useSettingsStore";
+
+function App() {
+  const { i18n } = useTranslation();
+  const language = useSettingsStore((state) => state.language);
+
+  useEffect(() => {
+    i18n.changeLanguage(language);
+  }, [language, i18n]);
+
+  return <div>{/* Your app content */}</div>;
+}
+```
+
+### Language Selector Component
+
+Create a language selector that updates both the settings store and i18n:
+
+```tsx LanguageSelector.tsx
+import { useTranslation } from "react-i18next";
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function LanguageSelector() {
+  const { i18n, t } = useTranslation();
+  const { language, setLanguage } = useSettingsStore();
+
+  const handleLanguageChange = (newLang: "en" | "es") => {
+    setLanguage(newLang);
+    i18n.changeLanguage(newLang);
+  };
+
+  return (
+    <div>
+      <span>{t("language")}</span>
+      
+      <select
+        value={language}
+        onChange={(e) => handleLanguageChange(e.target.value as "en" | "es")}
+      >
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  );
+}
+```
+
+### Programmatic Language Change
+
+Change the language programmatically from anywhere in your application:
+
+```tsx
+import { useTranslation } from "react-i18next";
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function QuickLanguageToggle() {
+  const { i18n } = useTranslation();
+  const setLanguage = useSettingsStore((state) => state.setLanguage);
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === "en" ? "es" : "en";
+    setLanguage(newLang as "en" | "es");
+    i18n.changeLanguage(newLang);
+  };
+
+  return (
+    <button onClick={toggleLanguage}>
+      {i18n.language === "en" ? "Español" : "English"}
+    </button>
+  );
+}
+```
+
+## Advanced Features
+
+### Translation with Variables
+
+Add support for dynamic variables in translations:
+
+```json
+{
+  "greeting": "Hello, {{name}}!",
+  "itemCount": "You have {{count}} items"
+}
+```
+
+Use variables in your components:
+
+```tsx
+import { useTranslation } from "react-i18next";
+
+function Greeting({ userName }: { userName: string }) {
+  const { t } = useTranslation();
+
+  return <h1>{t("greeting", { name: userName })}</h1>;
+}
+
+function ItemList({ count }: { count: number }) {
+  const { t } = useTranslation();
+
+  return <p>{t("itemCount", { count })}</p>;
+}
+```
+
+### Pluralization
+
+Handle plural forms in translations:
+
+```json
+{
+  "user_one": "{{count}} user",
+  "user_other": "{{count}} users"
+}
+```
+
+Use pluralization in components:
+
+```tsx
+import { useTranslation } from "react-i18next";
+
+function UserCount({ count }: { count: number }) {
+  const { t } = useTranslation();
+
+  return <p>{t("user", { count })}</p>;
+}
+```
+
+### Nested Translations
+
+Organize translations into namespaces:
+
+```json
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "Add User",
+    "editUser": "Edit User"
+  }
+}
+```
+
+Access nested translations:
+
+```tsx
+import { useTranslation } from "react-i18next";
+
+function UserActions() {
+  const { t } = useTranslation();
+
+  return (
+    <div>
+      <button>{t("common.save")}</button>
+      <button>{t("common.cancel")}</button>
+      <button>{t("users.addUser")}</button>
+    </div>
+  );
+}
+```
+
+## Adding New Languages
+
+### Step 1: Create Translation File
+
+Create a new JSON file in the `i18n` directory:
+
+```json i18n/fr.json
+{
+  "dashboard": "Tableau de bord",
+  "users": "Utilisateurs",
+  "settings": "Paramètres",
+  "language": "Langue",
+  "darkMode": "Mode sombre"
+}
+```
+
+### Step 2: Update i18n Configuration
+
+Add the new language to the i18n configuration:
+
+```typescript i18n/index.ts
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+
+import en from "./en.json";
+import es from "./es.json";
+import fr from "./fr.json"; // New language
+
+i18n.use(initReactI18next).init({
+  resources: {
+    en: { translation: en },
+    es: { translation: es },
+    fr: { translation: fr }, // Add French
+  },
+  fallbackLng: "en",
+  interpolation: {
+    escapeValue: false,
+  },
+});
+
+export default i18n;
+```
+
+### Step 3: Update Settings Store
+
+Update the Language type to include the new language:
+
+```typescript useSettingsStore.ts
+type Language = "es" | "en" | "fr"; // Add "fr"
+
+interface SettingsState {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+}
+```
+
+### Step 4: Update Language Selector
+
+Add the new language option to your language selector:
+
+```tsx
+<select value={language} onChange={(e) => setLanguage(e.target.value)}>
+  <option value="es">Español</option>
+  <option value="en">English</option>
+  <option value="fr">Français</option>
+</select>
+```
+
+## Best Practices
+
+<Card title="Consistent Keys" icon="key">
+  Use descriptive, consistent naming conventions for translation keys. Group related translations together (e.g., all user-related keys start with "user").
+</Card>
+
+<Card title="Default Language" icon="language">
+  Always maintain complete translations in your fallback language (English in this case) to ensure no missing translations.
+</Card>
+
+<Card title="Context Matters" icon="message-lines">
+  Provide context for translators by using descriptive key names. "save" could mean different things in different contexts.
+</Card>
+
+<Card title="Test All Languages" icon="vials">
+  Regularly test your application in all supported languages to catch missing translations and layout issues.
+</Card>
+
+<Warning>
+Some languages require more space for text than English. Test your UI with all languages to ensure buttons and labels don't overflow or get truncated.
+</Warning>
+
+## API Reference
+
+### `useTranslation` Hook
+
+<ParamField path="t" type="(key: string, options?: object) => string">
+  Translation function that returns the translated string for the given key. Supports interpolation and pluralization.
+</ParamField>
+
+<ParamField path="i18n" type="i18n instance">
+  The i18n instance with methods like `changeLanguage`, `language`, and `languages`.
+</ParamField>
+
+### Common Methods
+
+<ParamField path="i18n.changeLanguage" type="(lng: string) => Promise<TFunction>">
+  Changes the current language. Returns a promise that resolves when the language is loaded.
+</ParamField>
+
+<ParamField path="i18n.language" type="string">
+  The current language code (e.g., "en", "es").
+</ParamField>
+
+<ParamField path="i18n.languages" type="string[]">
+  Array of all available language codes.
+</ParamField>
+
+## Real-World Example
+
+Here's a complete example showing i18n integration in a user form:
+
+```tsx CompleteUserForm.tsx
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useUsersStore } from "../features/users/usersStore";
+import { useToastStore } from "../shared/store/useToastStore";
+import type { User } from "../features/users/types";
+
+interface Props {
+  onClose: () => void;
+  user?: User;
+}
+
+export function CompleteUserForm({ onClose, user }: Props) {
+  const { t } = useTranslation();
+  const addUser = useUsersStore((state) => state.addUser);
+  const updateUser = useUsersStore((state) => state.updateUser);
+  const showToast = useToastStore((state) => state.show);
+
+  const isEditMode = !!user;
+
+  const [form, setForm] = useState({
+    firstName: user?.firstName ?? "",
+    lastName: user?.lastName ?? "",
+    email: user?.email ?? "",
+    age: user?.age?.toString() ?? "",
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (isEditMode && user) {
+      updateUser({ ...user, ...form, age: Number(form.age) });
+      showToast(t("success")); // Translated success message
+    } else {
+      addUser({
+        id: Date.now(),
+        ...form,
+        age: Number(form.age),
+        username: form.firstName.toLowerCase(),
+        image: "https://i.pravatar.cc/150",
+      });
+      showToast(t("created")); // Translated created message
+    }
+
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <h2>{isEditMode ? t("edit") : t("add")}</h2>
+
+      <input
+        name="firstName"
+        value={form.firstName}
+        onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+        placeholder={t("name")}
+        required
+      />
+
+      <input
+        name="lastName"
+        value={form.lastName}
+        onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+        placeholder={t("lastname")}
+        required
+      />
+
+      <input
+        name="email"
+        type="email"
+        value={form.email}
+        onChange={(e) => setForm({ ...form, email: e.target.value })}
+        placeholder={t("email")}
+        required
+      />
+
+      <input
+        name="age"
+        type="number"
+        value={form.age}
+        onChange={(e) => setForm({ ...form, age: e.target.value })}
+        placeholder={t("age")}
+        required
+      />
+
+      <button type="submit">
+        {isEditMode ? t("update") : t("save")}
+      </button>
+    </form>
+  );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Settings" icon="gear" href="/features/settings">
+    Learn how language settings integrate with the settings store
+  </Card>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    See i18n in action with user management features
+  </Card>
+</CardGroup>

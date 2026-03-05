@@ -1,97 +1,63 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Auth Dashboard"
+description: "A modern React dashboard with authentication, user management, and internationalization"
 ---
 
-## Setting up
+<div style={{
+  background: 'linear-gradient(135deg, #fbc926 0%, #8c73fa 100%)',
+  padding: '3rem 2rem',
+  borderRadius: '12px',
+  marginBottom: '2rem',
+  color: '#ffffff'
+}}>
+  <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#ffffff' }}>
+    Welcome to Auth Dashboard
+  </h1>
+  <p style={{ fontSize: '1.25rem', opacity: 0.95, color: '#ffffff' }}>
+    Build secure, scalable authentication and user management systems with our modern React dashboard solution.
+  </p>
+</div>
 
-Get your documentation site up and running in minutes.
+## Key Features
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="JWT Authentication" icon="lock" href="/features/authentication">
+    Secure token-based authentication with automatic token refresh and storage
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Complete CRUD operations for managing users with search and pagination
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Dark Mode" icon="moon" href="/features/settings">
+    Built-in theme switching with dark mode support
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Multi-Language" icon="globe" href="/features/internationalization">
+    Internationalization support for English and Spanish
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Quick Start
 
-Everything you need to create world-class documentation.
+Get up and running with Auth Dashboard in minutes.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install dependencies and set up your development environment
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Follow our step-by-step guide to get started
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Learn More
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={3}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Understand the application structure and design patterns
+  </Card>
+  <Card title="State Management" icon="database" href="/development/state-management">
+    Learn how Zustand manages application state
+  </Card>
+  <Card title="API Integration" icon="plug" href="/development/api-integration">
+    Connect to external APIs and handle data fetching
+  </Card>
+</CardGroup>

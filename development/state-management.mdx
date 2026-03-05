@@ -1,0 +1,554 @@
+---
+title: State Management
+description: Guide to using Zustand for state management in the Auth Dashboard
+---
+
+## Overview
+
+The Auth Dashboard uses [Zustand](https://github.com/pmndrs/zustand) for state management. Zustand is a lightweight, fast, and scalable state management solution that uses React hooks.
+
+<Info>
+Zustand was chosen for its simplicity, minimal boilerplate, and excellent TypeScript support compared to Redux or Context API.
+</Info>
+
+## Why Zustand?
+
+<CardGroup cols={2}>
+  <Card title="Minimal Boilerplate" icon="feather">
+    No providers, actions, or reducers needed. Just create a store and use it.
+  </Card>
+  <Card title="TypeScript First" icon="code">
+    Excellent TypeScript inference with minimal type annotations.
+  </Card>
+  <Card title="Persistence Built-in" icon="database">
+    Easy persistence with the `persist` middleware.
+  </Card>
+  <Card title="No Re-render Issues" icon="bolt">
+    Fine-grained subscriptions prevent unnecessary re-renders.
+  </Card>
+</CardGroup>
+
+## Store Architecture
+
+Each feature has its own dedicated store:
+
+```
+src/
+├── features/
+│   ├── auth/
+│   │   └── authStore.tsx          # Authentication state
+│   └── users/
+│       └── usersStore.ts          # Users management state
+└── shared/
+    └── store/
+        ├── useToastStore.ts       # Global toast notifications
+        └── useSettingsStore.ts    # App settings (theme, language)
+```
+
+## Creating a Store
+
+### Basic Store Pattern
+
+Here's the pattern used throughout the application:
+
+```typescript
+import { create } from "zustand";
+
+interface MyState {
+  // State properties
+  data: MyData[];
+  loading: boolean;
+  error: string | null;
+  
+  // Actions
+  fetchData: () => Promise<void>;
+  updateData: (item: MyData) => void;
+}
+
+export const useMyStore = create<MyState>((set, get) => ({
+  // Initial state
+  data: [],
+  loading: false,
+  error: null,
+  
+  // Actions
+  fetchData: async () => {
+    set({ loading: true, error: null });
+    try {
+      const result = await apiCall();
+      set({ data: result, loading: false });
+    } catch (error) {
+      set({ error: error.message, loading: false });
+    }
+  },
+  
+  updateData: (item) => set((state) => ({
+    data: state.data.map(d => d.id === item.id ? item : d)
+  })),
+}));
+```
+
+## Authentication Store
+
+The auth store (`features/auth/authStore.tsx:7-38`) manages user authentication state:
+
+<CodeGroup>
+```typescript authStore.tsx
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { loginRequest } from "./authService";
+import type { AuthState } from "./types";
+
+export const useAuthStore = create<AuthState>()(\n  persist(
+    (set) => ({
+      user: null,
+      loading: false,
+
+      login: async (username, password) => {
+        try {
+          set({ loading: true });
+          const data = await loginRequest({ username, password });
+          set({ user: data, loading: false });
+          localStorage.setItem("token", data.token);
+        } catch (error) {
+          set({ loading: false });
+          console.error(error);
+          alert("Credenciales incorrectas");
+        }
+      },
+
+      logout: () => {
+        localStorage.removeItem("token");
+        set({ user: null });
+      },
+    }),
+    { name: "auth-storage" }
+  )
+);
+```
+
+```typescript types.ts
+export interface AuthUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  image: string;
+  token: string;
+}
+
+export interface AuthState {
+  user: AuthUser | null;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+```
+</CodeGroup>
+
+### Using the Auth Store
+
+```tsx
+import { useAuthStore } from "@/features/auth/authStore";
+
+function LoginPage() {
+  const login = useAuthStore((state) => state.login);
+  const loading = useAuthStore((state) => state.loading);
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await login(username, password);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* form fields */}
+      <button disabled={loading}>
+        {loading ? "Logging in..." : "Login"}
+      </button>
+    </form>
+  );
+}
+```
+
+<Note>
+The auth store uses the `persist` middleware to save authentication state to localStorage with the key `auth-storage`.
+</Note>
+
+## Users Store
+
+The users store (`features/users/usersStore.ts:18-66`) demonstrates a more complex state management pattern:
+
+```typescript
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { getUsers } from "./usersService";
+import type { User } from "./types";
+
+interface UsersState {
+  users: User[];
+  loading: boolean;
+  error: string | null;
+  deletingId: number | null;
+
+  fetchUsers: () => Promise<void>;
+  addUser: (user: User) => void;
+  deleteUser: (id: number) => void;
+  updateUser: (user: User) => void;
+}
+
+export const useUsersStore = create<UsersState>()(\n  persist(
+    (set, get) => ({
+      users: [],
+      loading: false,
+      error: null,
+      deletingId: null,
+
+      fetchUsers: async () => {
+        // Skip if already loaded
+        if (get().users.length > 0) return;
+
+        try {
+          set({ loading: true, error: null });
+          const usersFromApi = await getUsers();
+          set({ users: usersFromApi, loading: false });
+        } catch {
+          set({ error: "Error fetching users", loading: false });
+        }
+      },
+
+      addUser: (user) =>
+        set((state) => ({
+          users: [user, ...state.users],
+        })),
+
+      deleteUser: (id) => {
+        set({ deletingId: id });
+        set((state) => ({
+          users: state.users.filter((user) => user.id !== id),
+          deletingId: null,
+        }));
+      },
+
+      updateUser: (updatedUser: User) =>
+        set((state) => ({
+          users: state.users.map((user) =>
+            user.id === updatedUser.id ? updatedUser : user
+          ),
+        })),
+    }),
+    { name: "users-storage" }
+  )
+);
+```
+
+### Key Patterns
+
+<AccordionGroup>
+  <Accordion title="Optimistic Updates">
+    The `addUser` and `updateUser` actions update the local state immediately without waiting for API confirmation. This provides a snappy user experience.
+    
+    ```typescript
+    addUser: (user) =>
+      set((state) => ({
+        users: [user, ...state.users],
+      })),
+    ```
+  </Accordion>
+
+  <Accordion title="Loading States">
+    Track multiple loading states for different operations:
+    
+    ```typescript
+    loading: false,        // General loading
+    deletingId: null,      // Specific item being deleted
+    ```
+  </Accordion>
+
+  <Accordion title="Cache-First Pattern">
+    The `fetchUsers` function checks if data is already loaded before making an API call:
+    
+    ```typescript
+    fetchUsers: async () => {
+      if (get().users.length > 0) return;
+      // ... fetch from API
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Using get() for Current State">
+    The `get` function provides access to the current state within actions:
+    
+    ```typescript
+    create<State>()((set, get) => ({
+      myAction: () => {
+        const currentUsers = get().users;
+        // ... use currentUsers
+      }
+    }))
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Global Stores
+
+### Toast Store
+
+Simple store for showing temporary notifications (`shared/store/useToastStore.ts:9-13`):
+
+```typescript
+import { create } from "zustand";
+
+interface ToastState {
+  message: string | null;
+  show: (msg: string) => void;
+  hide: () => void;
+}
+
+export const useToastStore = create<ToastState>((set) => ({
+  message: null,
+  show: (msg) => set({ message: msg }),
+  hide: () => set({ message: null }),
+}));
+```
+
+Usage:
+```tsx
+import { useToastStore } from "@/shared/store/useToastStore";
+
+function MyComponent() {
+  const showToast = useToastStore((state) => state.show);
+  
+  const handleSuccess = () => {
+    showToast("Operation successful!");
+  };
+}
+```
+
+### Settings Store
+
+Manages app-wide settings like theme and language preferences:
+
+```typescript
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+interface SettingsState {
+  theme: "light" | "dark";
+  language: "en" | "es";
+  setTheme: (theme: "light" | "dark") => void;
+  setLanguage: (language: "en" | "es") => void;
+}
+
+export const useSettingsStore = create<SettingsState>()(\n  persist(
+    (set) => ({
+      theme: "light",
+      language: "en",
+      setTheme: (theme) => set({ theme }),
+      setLanguage: (language) => set({ language }),
+    }),
+    { name: "settings-storage" }
+  )
+);
+```
+
+## Using Stores in Components
+
+### Selector Pattern
+
+<Tabs>
+  <Tab title="Recommended">
+    Select only the state you need to prevent unnecessary re-renders:
+    
+    ```tsx
+    function UserList() {
+      // Only re-renders when users array changes
+      const users = useUsersStore((state) => state.users);
+      const fetchUsers = useUsersStore((state) => state.fetchUsers);
+      
+      useEffect(() => {
+        fetchUsers();
+      }, []);
+      
+      return <div>{/* render users */}</div>;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Anti-pattern">
+    Don't select the entire state unless you need it:
+    
+    ```tsx
+    // ❌ Re-renders on ANY state change
+    const state = useUsersStore();
+    ```
+  </Tab>
+</Tabs>
+
+### Multiple Selectors
+
+```tsx
+function UserStats() {
+  const users = useUsersStore((state) => state.users);
+  const loading = useUsersStore((state) => state.loading);
+  const error = useUsersStore((state) => state.error);
+  
+  if (loading) return <Spinner />;
+  if (error) return <Error message={error} />;
+  
+  return <div>Total users: {users.length}</div>;
+}
+```
+
+### Calling Actions
+
+```tsx
+function AddUserButton() {
+  const addUser = useUsersStore((state) => state.addUser);
+  
+  const handleClick = () => {
+    addUser({
+      id: Date.now(),
+      name: "New User",
+      email: "user@example.com"
+    });
+  };
+  
+  return <button onClick={handleClick}>Add User</button>;
+}
+```
+
+## Persist Middleware
+
+The `persist` middleware automatically saves and restores state from localStorage.
+
+### Configuration
+
+```typescript
+import { persist } from "zustand/middleware";
+
+export const useMyStore = create<MyState>()(\n  persist(
+    (set, get) => ({
+      // ... store implementation
+    }),
+    {
+      name: "my-storage",              // localStorage key
+      partialize: (state) => ({         // Optional: only persist specific fields
+        users: state.users,
+      }),
+    }
+  )
+);
+```
+
+<Warning>
+Sensitive data like tokens should be stored in localStorage separately, not in persisted Zustand stores, for better security control.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="One Store Per Feature" icon="box">
+    Keep stores focused on a single domain. Don't create a global store for everything.
+  </Card>
+  
+  <Card title="Use Selectors" icon="filter">
+    Always use selectors to pick specific state slices. This prevents unnecessary re-renders.
+  </Card>
+  
+  <Card title="Async in Actions" icon="spinner">
+    Handle async operations inside store actions, not in components.
+  </Card>
+  
+  <Card title="TypeScript Types" icon="shield">
+    Define TypeScript interfaces in separate `types.ts` files for reusability.
+  </Card>
+</CardGroup>
+
+### Do's and Don'ts
+
+<Tabs>
+  <Tab title="Do">
+    ```typescript
+    // ✅ Select specific state
+    const user = useAuthStore((state) => state.user);
+    
+    // ✅ Handle errors in the store
+    try {
+      const data = await api();
+      set({ data });
+    } catch (error) {
+      set({ error: error.message });
+    }
+    
+    // ✅ Use functional updates for state that depends on previous state
+    set((state) => ({
+      count: state.count + 1
+    }));
+    ```
+  </Tab>
+  
+  <Tab title="Don't">
+    ```typescript
+    // ❌ Don't select entire state
+    const state = useAuthStore();
+    
+    // ❌ Don't handle API calls in components
+    const users = useUsersStore((state) => state.users);
+    useEffect(() => {
+      api.get('/users').then(data => /* update store */);
+    }, []);
+    
+    // ❌ Don't mutate state directly
+    state.users.push(newUser); // Wrong!
+    ```
+  </Tab>
+</Tabs>
+
+## Testing Stores
+
+Stores are easy to test since they're just JavaScript functions:
+
+```typescript
+import { renderHook, act } from "@testing-library/react";
+import { useUsersStore } from "./usersStore";
+
+describe("useUsersStore", () => {
+  beforeEach(() => {
+    // Reset store before each test
+    useUsersStore.setState({ users: [], loading: false });
+  });
+  
+  it("should add a user", () => {
+    const { result } = renderHook(() => useUsersStore());
+    
+    act(() => {
+      result.current.addUser({
+        id: 1,
+        name: "Test User",
+        email: "test@example.com"
+      });
+    });
+    
+    expect(result.current.users).toHaveLength(1);
+    expect(result.current.users[0].name).toBe("Test User");
+  });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Learn about the overall application architecture
+  </Card>
+  <Card title="API Integration" icon="plug" href="/development/api-integration">
+    See how stores integrate with API services
+  </Card>
+  <Card title="Components" icon="layer-group" href="/development/components">
+    Use stores in shared components
+  </Card>
+  <Card title="Zustand Docs" icon="book" href="https://github.com/pmndrs/zustand">
+    Official Zustand documentation
+  </Card>
+</CardGroup>

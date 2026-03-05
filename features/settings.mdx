@@ -1,0 +1,495 @@
+---
+title: Settings & Preferences
+description: Configure application settings including theme, language, and user preferences with persistent storage
+---
+
+## Overview
+
+The Settings system provides a centralized way to manage application-wide preferences including theme (light/dark mode) and language selection. All settings are persisted to localStorage and automatically synchronized across browser tabs.
+
+## Architecture
+
+The settings system consists of two main components:
+
+- **useSettingsStore.ts**: Zustand store for settings state management
+- **Settings.tsx**: UI component for managing preferences
+- **useToastStore.ts**: Toast notification system for user feedback
+
+## Data Models
+
+### Settings Types
+
+```typescript
+type Theme = "light" | "dark";
+type Language = "es" | "en";
+
+interface SettingsState {
+  theme: Theme;
+  language: Language;
+  toggleTheme: () => void;
+  setLanguage: (lang: Language) => void;
+}
+```
+
+## Settings Store
+
+The settings store manages theme and language preferences with automatic persistence:
+
+```typescript useSettingsStore.ts
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+type Theme = "light" | "dark";
+type Language = "es" | "en";
+
+interface SettingsState {
+  theme: Theme;
+  language: Language;
+  toggleTheme: () => void;
+  setLanguage: (lang: Language) => void;
+}
+
+export const useSettingsStore = create<SettingsState>()(\n  persist(
+    (set, get) => ({
+      theme: "light",
+      language: "es",
+
+      toggleTheme: () =>
+        set({
+          theme: get().theme === "light" ? "dark" : "light",
+        }),
+
+      setLanguage: (language) => set({ language }),
+    }),
+    {
+      name: "settings",
+    }
+  )
+);
+```
+
+<Note>
+The persist middleware automatically saves settings to localStorage under the key `settings`. This ensures user preferences are maintained across browser sessions.
+</Note>
+
+## Usage Examples
+
+### Settings Page Implementation
+
+Create a settings page where users can modify their preferences:
+
+```tsx Settings.tsx
+import { PageContainer } from "../../shared/components/PageContainer";
+import { useSettingsStore } from "../../shared/store/useSettingsStore";
+import { useTranslation } from "react-i18next";
+
+const Settings = () => {
+  const { theme, toggleTheme } = useSettingsStore();
+  const { language, setLanguage } = useSettingsStore();
+  const { t } = useTranslation();
+
+  return (
+    <PageContainer title={t("settings")} subtitle={t("preferences")}>
+      <div className="space-y-6 max-w-xl">
+        {/* Dark Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <span className="font-medium dark:text-gray-200">
+            {t("darkMode")}
+          </span>
+
+          <button
+            onClick={toggleTheme}
+            className="px-4 py-2 border rounded dark:text-gray-200"
+          >
+            {theme === "dark" ? "On" : "Off"}
+          </button>
+        </div>
+
+        {/* Language Selector */}
+        <div className="flex items-center justify-between">
+          <span className="font-medium dark:text-gray-200">
+            {t("language")}
+          </span>
+
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as "en" | "es")}
+            className="border px-3 py-2 rounded dark:text-gray-200"
+          >
+            <option value="es" className="dark:text-gray-800">
+              Español
+            </option>
+            <option value="en" className="dark:text-gray-800">
+              English
+            </option>
+          </select>
+        </div>
+      </div>
+    </PageContainer>
+  );
+};
+
+export default Settings;
+```
+
+### Accessing Settings in Components
+
+You can access settings from any component in your application:
+
+```tsx
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function ThemeAwareComponent() {
+  const theme = useSettingsStore((state) => state.theme);
+  const language = useSettingsStore((state) => state.language);
+
+  return (
+    <div className={theme === "dark" ? "dark-mode" : "light-mode"}>
+      <p>Current theme: {theme}</p>
+      <p>Current language: {language}</p>
+    </div>
+  );
+}
+```
+
+### Toggle Theme Programmatically
+
+Toggle the theme from any component:
+
+```tsx
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function ThemeToggleButton() {
+  const toggleTheme = useSettingsStore((state) => state.toggleTheme);
+  const theme = useSettingsStore((state) => state.theme);
+
+  return (
+    <button onClick={toggleTheme}>
+      Switch to {theme === "light" ? "dark" : "light"} mode
+    </button>
+  );
+}
+```
+
+### Change Language Programmatically
+
+Update the language from any component:
+
+```tsx
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function LanguageSwitcher() {
+  const setLanguage = useSettingsStore((state) => state.setLanguage);
+
+  return (
+    <div>
+      <button onClick={() => setLanguage("en")}>English</button>
+      <button onClick={() => setLanguage("es")}>Español</button>
+    </div>
+  );
+}
+```
+
+## Theme Implementation
+
+### Dark Mode with Tailwind CSS
+
+The application uses Tailwind CSS for dark mode styling. Apply the theme by adding a class to your root element:
+
+```tsx AppInitializer.tsx
+import { useEffect } from "react";
+import { useSettingsStore } from "./shared/store/useSettingsStore";
+
+function AppInitializer() {
+  const theme = useSettingsStore((state) => state.theme);
+
+  useEffect(() => {
+    // Apply theme to document root
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
+
+  return null;
+}
+```
+
+<Tip>
+With Tailwind CSS, you can use the `dark:` prefix to apply styles conditionally:
+```tsx
+<div className="bg-white dark:bg-gray-900 text-black dark:text-white">
+  This content adapts to the theme
+</div>
+```
+</Tip>
+
+### Custom Theme Hook
+
+Create a custom hook for more complex theme logic:
+
+```tsx useTheme.ts
+import { useEffect } from "react";
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+export function useTheme() {
+  const theme = useSettingsStore((state) => state.theme);
+  const toggleTheme = useSettingsStore((state) => state.toggleTheme);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    
+    if (theme === "dark") {
+      root.classList.add("dark");
+      root.style.colorScheme = "dark";
+    } else {
+      root.classList.remove("dark");
+      root.style.colorScheme = "light";
+    }
+  }, [theme]);
+
+  return { theme, toggleTheme, isDark: theme === "dark" };
+}
+```
+
+## Toast Notification System
+
+The application includes a toast notification system for user feedback:
+
+```typescript useToastStore.ts
+import { create } from "zustand";
+
+interface ToastState {
+  message: string | null;
+  show: (msg: string) => void;
+  hide: () => void;
+}
+
+export const useToastStore = create<ToastState>((set) => ({
+  message: null,
+  show: (msg) => set({ message: msg }),
+  hide: () => set({ message: null }),
+}));
+```
+
+### Using Toasts
+
+Display toast notifications throughout your application:
+
+```tsx
+import { useToastStore } from "../shared/store/useToastStore";
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function SettingsWithToast() {
+  const toggleTheme = useSettingsStore((state) => state.toggleTheme);
+  const showToast = useToastStore((state) => state.show);
+
+  const handleThemeChange = () => {
+    toggleTheme();
+    showToast("Theme changed successfully!");
+  };
+
+  return <button onClick={handleThemeChange}>Toggle Theme</button>;
+}
+```
+
+### Toast Component
+
+Implement a toast notification component:
+
+```tsx Toast.tsx
+import { useEffect } from "react";
+import { useToastStore } from "./useToastStore";
+
+export function Toast() {
+  const { message, hide } = useToastStore();
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        hide();
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [message, hide]);
+
+  if (!message) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
+      {message}
+    </div>
+  );
+}
+```
+
+## Integration with i18n
+
+The settings store integrates seamlessly with the internationalization system. When language changes, i18n automatically updates:
+
+```tsx
+import { useEffect } from "react";
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+import { useTranslation } from "react-i18next";
+
+function LanguageSync() {
+  const language = useSettingsStore((state) => state.language);
+  const { i18n } = useTranslation();
+
+  useEffect(() => {
+    i18n.changeLanguage(language);
+  }, [language, i18n]);
+
+  return null;
+}
+```
+
+Learn more about internationalization in the [Internationalization](/features/internationalization) documentation.
+
+## API Reference
+
+### `useSettingsStore` Methods
+
+<ParamField path="toggleTheme" type="() => void">
+  Toggles between light and dark theme. Automatically persists the new theme to localStorage.
+</ParamField>
+
+<ParamField path="setLanguage" type="(lang: Language) => void">
+  Sets the application language to either "en" (English) or "es" (Spanish). The change is persisted automatically.
+</ParamField>
+
+### `useSettingsStore` State
+
+<ParamField path="theme" type="'light' | 'dark'">
+  The current theme setting. Defaults to "light".
+</ParamField>
+
+<ParamField path="language" type="'es' | 'en'">
+  The current language setting. Defaults to "es" (Spanish).
+</ParamField>
+
+### `useToastStore` Methods
+
+<ParamField path="show" type="(msg: string) => void">
+  Displays a toast notification with the specified message.
+</ParamField>
+
+<ParamField path="hide" type="() => void">
+  Hides the currently displayed toast notification.
+</ParamField>
+
+### `useToastStore` State
+
+<ParamField path="message" type="string | null">
+  The current toast message being displayed, or null if no toast is active.
+</ParamField>
+
+## Advanced Features
+
+### Multiple Themes
+
+Extend the settings store to support more than two themes:
+
+```typescript
+type Theme = "light" | "dark" | "auto" | "high-contrast";
+
+interface SettingsState {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+}
+
+export const useSettingsStore = create<SettingsState>()(\n  persist(
+    (set) => ({
+      theme: "light",
+      setTheme: (theme) => set({ theme }),
+    }),
+    { name: "settings" }
+  )
+);
+```
+
+### System Theme Detection
+
+Detect and apply the system theme preference:
+
+```tsx
+import { useEffect } from "react";
+import { useSettingsStore } from "../shared/store/useSettingsStore";
+
+function SystemThemeDetector() {
+  const setTheme = useSettingsStore((state) => state.setTheme);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setTheme(e.matches ? "dark" : "light");
+    };
+
+    // Set initial theme
+    setTheme(mediaQuery.matches ? "dark" : "light");
+
+    // Listen for changes
+    mediaQuery.addEventListener("change", handleChange);
+    
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [setTheme]);
+
+  return null;
+}
+```
+
+### Additional Settings
+
+Extend the settings store with additional preferences:
+
+```typescript
+interface SettingsState {
+  theme: Theme;
+  language: Language;
+  notifications: boolean;
+  soundEnabled: boolean;
+  fontSize: "small" | "medium" | "large";
+  
+  toggleTheme: () => void;
+  setLanguage: (lang: Language) => void;
+  toggleNotifications: () => void;
+  toggleSound: () => void;
+  setFontSize: (size: "small" | "medium" | "large") => void;
+}
+```
+
+## Best Practices
+
+<Card title="Centralized Settings" icon="sliders">
+  Keep all application-wide settings in a single store for easier management and debugging.
+</Card>
+
+<Card title="Type Safety" icon="shield-check">
+  Use TypeScript types to ensure only valid values are set for theme and language options.
+</Card>
+
+<Card title="Persistence" icon="database">
+  Leverage Zustand's persist middleware to automatically save settings to localStorage without manual implementation.
+</Card>
+
+<Card title="User Feedback" icon="bell">
+  Always provide visual feedback (toasts, animations) when settings change to confirm the action to users.
+</Card>
+
+<Warning>
+When adding new settings, ensure they have sensible defaults and don't break the application if localStorage is cleared or unavailable.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Internationalization" icon="globe" href="/features/internationalization">
+    Learn how the language setting integrates with i18n
+  </Card>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Explore how toasts are used in user operations
+  </Card>
+</CardGroup>

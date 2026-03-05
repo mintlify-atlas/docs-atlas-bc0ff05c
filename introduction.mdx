@@ -1,0 +1,96 @@
+---
+title: Introduction
+description: Welcome to Auth Dashboard - A modern authentication and user management system built with React and TypeScript
+---
+
+## What is Auth Dashboard?
+
+Auth Dashboard is a production-ready authentication and user management system built with modern web technologies. It provides a complete solution for handling user authentication, authorization, and user management with a clean, intuitive interface.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock">
+    Secure JWT-based authentication with automatic token management and session persistence
+  </Card>
+  <Card title="User Management" icon="users">
+    Complete CRUD operations for user management with real-time updates
+  </Card>
+  <Card title="Protected Routes" icon="shield">
+    Built-in route protection with automatic redirects for unauthorized access
+  </Card>
+  <Card title="State Management" icon="database">
+    Powered by Zustand with persistent storage for seamless user experience
+  </Card>
+</CardGroup>
+
+## Technology Stack
+
+Auth Dashboard is built with industry-standard technologies:
+
+- **React 19** - Modern UI framework with latest features
+- **TypeScript** - Type-safe development experience
+- **Zustand** - Lightweight state management with persistence
+- **React Router** - Declarative routing with v7
+- **Axios** - HTTP client with interceptors
+- **Tailwind CSS** - Utility-first styling
+- **Vite** - Fast build tool and dev server
+- **i18next** - Internationalization support
+
+## Architecture Overview
+
+The dashboard follows a feature-based architecture:
+
+```
+src/
+├── features/          # Feature modules
+│   ├── auth/         # Authentication logic
+│   └── users/        # User management
+├── pages/            # Page components
+├── services/         # API services
+├── app/              # App configuration
+└── shared/           # Shared components
+```
+
+<Note>
+  The codebase uses a modular structure where each feature is self-contained with its own services, stores, and components.
+</Note>
+
+## Core Concepts
+
+### Authentication Flow
+
+Auth Dashboard uses JWT tokens stored in localStorage with automatic token injection via Axios interceptors. The authentication state is managed globally using Zustand with persistence middleware.
+
+### Protected Routes
+
+Routes are protected using a `ProtectedRoute` component that checks authentication status and redirects unauthenticated users to the login page.
+
+### State Persistence
+
+User sessions persist across browser refreshes using Zustand's persist middleware, ensuring a seamless user experience.
+
+## Getting Help
+
+If you encounter any issues or have questions:
+
+- Check the [Quick Start](/quickstart) guide for setup instructions
+- Review the [Configuration](/configuration) for environment setup
+- Refer to the [Installation](/installation) guide for dependency management
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes with our step-by-step guide
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install dependencies and set up your development environment
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure your dashboard with environment variables and settings
+  </Card>
+  <Card title="Authentication" icon="key" href="/features/authentication">
+    Learn how authentication works under the hood
+  </Card>
+</CardGroup>

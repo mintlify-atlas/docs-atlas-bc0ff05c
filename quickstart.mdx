@@ -1,80 +1,257 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get your Auth Dashboard up and running in minutes with this step-by-step guide
 ---
 
-## Get started in three steps
+## Get Started in 5 Minutes
 
-Get your documentation site running locally and make your first customization.
+This guide will help you set up and run the Auth Dashboard locally. You'll learn how to install dependencies, configure the application, and implement authentication.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+Before you begin, ensure you have:
 
-### Step 2: Deploy your changes
+- **Node.js 18+** installed on your machine
+- **npm**, **yarn**, or **pnpm** package manager
+- A code editor (VS Code recommended)
+- Basic knowledge of React and TypeScript
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Setup Steps
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
+  <Step title="Clone and Install">
+    First, navigate to your project directory and install dependencies:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
 
-### Step 3: Go live
+      ```bash yarn
+      yarn install
+      ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
 
-## Next steps
+    This installs all required packages including React, TypeScript, Zustand, and Axios.
+  </Step>
 
-Now that you have your docs running, explore these key features:
+  <Step title="Start the Development Server">
+    Run the development server:
 
-<CardGroup cols={2}>
+    <CodeGroup>
+      ```bash npm
+      npm run dev
+      ```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+      ```bash yarn
+      yarn dev
+      ```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+      ```bash pnpm
+      pnpm dev
+      ```
+    </CodeGroup>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    The application will start at `http://localhost:5173` (default Vite port).
+  </Step>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+  <Step title="Access the Login Page">
+    Open your browser and navigate to `http://localhost:5173/login`. You'll see the login interface.
 
-</CardGroup>
+    <Note>
+      The dashboard uses DummyJSON API for demonstration. Use the default credentials: `emilys` / `emilyspass`
+    </Note>
+  </Step>
+
+  <Step title="Implement Authentication">
+    The authentication system is already configured. Here's how it works:
+
+    ```tsx src/features/auth/authStore.tsx
+    import { create } from "zustand";
+    import { persist } from "zustand/middleware";
+    import { loginRequest } from "./authService";
+
+    export const useAuthStore = create<AuthState>()()
+      persist(
+        (set) => ({
+          user: null,
+          loading: false,
+
+          login: async (username, password) => {
+            try {
+              set({ loading: true });
+              const data = await loginRequest({ username, password });
+              set({ user: data, loading: false });
+              localStorage.setItem("token", data.token);
+            } catch (error) {
+              set({ loading: false });
+              console.error(error);
+            }
+          },
+
+          logout: () => {
+            localStorage.removeItem("token");
+            set({ user: null });
+          },
+        }),
+        { name: "auth-storage" }
+      )
+    );
+    ```
+
+    The store uses Zustand with persistence to maintain user sessions across page refreshes.
+  </Step>
+
+  <Step title="Use Authentication in Components">
+    Access authentication state and methods in any component:
+
+    ```tsx src/pages/Login.tsx
+    import { useAuthStore } from "../features/auth/authStore";
+    import { useNavigate } from "react-router-dom";
+
+    export default function Login() {
+      const login = useAuthStore((state) => state.login);
+      const loading = useAuthStore((state) => state.loading);
+      const navigate = useNavigate();
+
+      const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await login(username, password);
+        
+        if (useAuthStore.getState().user) {
+          navigate("/", { replace: true });
+        }
+      };
+
+      return (
+        <form onSubmit={handleSubmit}>
+          {/* Form fields */}
+        </form>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Protect Your Routes">
+    Use the built-in `ProtectedRoute` component to secure routes:
+
+    ```tsx src/app/router.tsx
+    import { createBrowserRouter } from "react-router-dom";
+    import ProtectedRoute from "./ProtectedRoute";
+    import { DashboardLayout } from "../shared/layout/DashboardLayout";
+
+    export const router = createBrowserRouter([
+      {
+        element: <ProtectedRoute />,
+        children: [
+          {
+            path: "/",
+            element: <DashboardLayout />,
+            children: [
+              { index: true, element: <Dashboard /> },
+              { path: "users", element: <Users /> },
+              { path: "settings", element: <Settings /> },
+            ],
+          },
+        ],
+      },
+    ]);
+    ```
+
+    The `ProtectedRoute` automatically redirects unauthenticated users to `/login`:
+
+    ```tsx src/app/ProtectedRoute.tsx
+    import { Navigate, Outlet } from "react-router-dom";
+    import { useAuthStore } from "../features/auth/authStore";
+
+    const ProtectedRoute = () => {
+      const user = useAuthStore((state) => state.user);
+      return user ? <Outlet /> : <Navigate to="/login" replace />;
+    };
+    ```
+  </Step>
+</Steps>
+
+## Test the Authentication
+
+You can now test the complete authentication flow:
+
+1. Navigate to `http://localhost:5173/login`
+2. Enter credentials: `emilys` / `emilyspass`
+3. Click "Login" - you'll be redirected to the dashboard
+4. Try accessing protected routes - they'll work!
+5. Refresh the page - your session persists
+6. Logout and try accessing protected routes - you'll be redirected to login
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The application uses DummyJSON API (`https://dummyjson.com`) for backend services. In production, replace this with your own API.
 </Note>
+
+## API Configuration
+
+The API client is configured in `src/services/api.ts` with automatic token injection:
+
+```typescript src/services/api.ts
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: "https://dummyjson.com",
+});
+
+// Automatically inject tokens
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Learn how to configure the API endpoint and other settings
+  </Card>
+  <Card title="Authentication Guide" icon="key" href="/features/authentication">
+    Deep dive into the authentication system
+  </Card>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Explore user CRUD operations
+  </Card>
+  <Card title="Routing" icon="route" href="/development/routing">
+    Learn about protected routes and navigation
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Port 5173 already in use">
+    If port 5173 is already in use, Vite will automatically try the next available port. Check your terminal output for the actual port.
+  </Accordion>
+
+  <Accordion title="Login fails with network error">
+    Ensure you have an active internet connection. The app uses DummyJSON API which requires internet access.
+  </Accordion>
+
+  <Accordion title="Session doesn't persist">
+    Check your browser's localStorage settings. The app uses localStorage for session persistence.
+  </Accordion>
+</AccordionGroup>

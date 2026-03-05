@@ -1,0 +1,324 @@
+---
+title: Installation
+description: Install and set up Auth Dashboard with your preferred package manager
+---
+
+## System Requirements
+
+Before installing Auth Dashboard, ensure your system meets these requirements:
+
+- **Node.js**: Version 18.0.0 or higher
+- **Package Manager**: npm, yarn, or pnpm
+- **Operating System**: Windows, macOS, or Linux
+- **Memory**: At least 4GB RAM for development
+
+<Note>
+  We recommend using the latest LTS version of Node.js for optimal performance and security.
+</Note>
+
+## Installation Methods
+
+### Using npm
+
+Install all dependencies using npm:
+
+<CodeGroup>
+  ```bash Install
+  npm install
+  ```
+
+  ```bash Install with CI
+  npm ci
+  ```
+
+  ```bash Clean Install
+  rm -rf node_modules package-lock.json
+  npm install
+  ```
+</CodeGroup>
+
+### Using Yarn
+
+Install all dependencies using Yarn:
+
+<CodeGroup>
+  ```bash Install
+  yarn install
+  ```
+
+  ```bash Install Frozen
+  yarn install --frozen-lockfile
+  ```
+
+  ```bash Clean Install
+  rm -rf node_modules yarn.lock
+  yarn install
+  ```
+</CodeGroup>
+
+### Using pnpm
+
+Install all dependencies using pnpm:
+
+<CodeGroup>
+  ```bash Install
+  pnpm install
+  ```
+
+  ```bash Install Frozen
+  pnpm install --frozen-lockfile
+  ```
+
+  ```bash Clean Install
+  rm -rf node_modules pnpm-lock.yaml
+  pnpm install
+  ```
+</CodeGroup>
+
+<Tip>
+  pnpm is the fastest package manager and uses less disk space due to its content-addressable storage.
+</Tip>
+
+## Core Dependencies
+
+Auth Dashboard includes these essential dependencies:
+
+### Production Dependencies
+
+```json package.json
+{
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.1",
+    "zustand": "^5.0.11",
+    "axios": "^1.13.5",
+    "i18next": "^25.8.13",
+    "react-i18next": "^16.5.4",
+    "tailwindcss": "^4.2.1",
+    "@tailwindcss/vite": "^4.2.1"
+  }
+}
+```
+
+<AccordionGroup>
+  <Accordion title="React & React DOM" icon="react">
+    Latest React 19 with concurrent features and automatic batching for optimal performance.
+  </Accordion>
+
+  <Accordion title="React Router" icon="route">
+    Version 7 provides data loading, nested routes, and improved navigation with loaders and actions.
+  </Accordion>
+
+  <Accordion title="Zustand" icon="database">
+    Lightweight state management (3kb) with middleware support for persistence and devtools.
+  </Accordion>
+
+  <Accordion title="Axios" icon="network-wired">
+    Promise-based HTTP client with interceptors for automatic token management and error handling.
+  </Accordion>
+
+  <Accordion title="i18next" icon="language">
+    Internationalization framework supporting multiple languages (English and Spanish included).
+  </Accordion>
+
+  <Accordion title="Tailwind CSS" icon="palette">
+    Utility-first CSS framework with Vite plugin for optimal build performance.
+  </Accordion>
+</AccordionGroup>
+
+### Development Dependencies
+
+```json package.json
+{
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "vite": "^7.3.1",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "typescript-eslint": "^8.48.0"
+  }
+}
+```
+
+<Note>
+  TypeScript provides type safety and better developer experience with autocomplete and compile-time error checking.
+</Note>
+
+## Verify Installation
+
+After installation, verify everything is set up correctly:
+
+<Steps>
+  <Step title="Check Node Version">
+    ```bash
+    node --version
+    ```
+    Should output v18.0.0 or higher.
+  </Step>
+
+  <Step title="Check Package Manager">
+    <CodeGroup>
+      ```bash npm
+      npm --version
+      ```
+
+      ```bash yarn
+      yarn --version
+      ```
+
+      ```bash pnpm
+      pnpm --version
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Verify Dependencies">
+    Check that all packages are installed:
+    ```bash
+    ls node_modules
+    ```
+    You should see directories for react, zustand, axios, etc.
+  </Step>
+
+  <Step title="Run Type Check">
+    Verify TypeScript compilation:
+    ```bash
+    npm run build
+    ```
+    Should compile without errors.
+  </Step>
+</Steps>
+
+## Available Scripts
+
+Once installed, you can run these commands:
+
+<CodeGroup>
+  ```bash Development Server
+  npm run dev
+  # Starts Vite dev server on http://localhost:5173
+  ```
+
+  ```bash Production Build
+  npm run build
+  # Compiles TypeScript and builds optimized production bundle
+  ```
+
+  ```bash Lint Code
+  npm run lint
+  # Runs ESLint to check code quality
+  ```
+
+  ```bash Preview Production
+  npm run preview
+  # Preview production build locally
+  ```
+</CodeGroup>
+
+## Build Configuration
+
+The project uses Vite with minimal configuration:
+
+```typescript vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})
+```
+
+<Tip>
+  Vite provides instant HMR (Hot Module Replacement) and lightning-fast cold starts compared to traditional bundlers.
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Installation fails with permission errors">
+    If you encounter EACCES errors, avoid using `sudo`. Instead:
+    ```bash
+    npm config set prefix ~/.npm-global
+    export PATH=~/.npm-global/bin:$PATH
+    ```
+  </Accordion>
+
+  <Accordion title="Peer dependency warnings">
+    Peer dependency warnings are usually safe to ignore. If you want to resolve them:
+    ```bash
+    npm install --legacy-peer-deps
+    ```
+  </Accordion>
+
+  <Accordion title="Module not found errors">
+    Clear cache and reinstall:
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+
+  <Accordion title="TypeScript errors during build">
+    Ensure TypeScript version matches:
+    ```bash
+    npm list typescript
+    ```
+    Should show version ~5.9.3
+  </Accordion>
+
+  <Accordion title="Vite build fails">
+    Check Node.js version:
+    ```bash
+    node --version
+    ```
+    Vite 7 requires Node.js 18 or higher.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+After successful installation:
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure your API endpoint and application settings
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Follow the quick start guide to run your first authentication
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Understand the application architecture and patterns
+  </Card>
+  <Card title="Features" icon="sparkles" href="/features/authentication">
+    Explore authentication and user management features
+  </Card>
+</CardGroup>
+
+## Updating Dependencies
+
+To keep your dependencies up to date:
+
+<CodeGroup>
+  ```bash npm
+  npm update
+  npm outdated  # Check for outdated packages
+  ```
+
+  ```bash yarn
+  yarn upgrade
+  yarn outdated
+  ```
+
+  ```bash pnpm
+  pnpm update
+  pnpm outdated
+  ```
+</CodeGroup>
+
+<Warning>
+  Always test your application after updating major versions. Check the changelog for breaking changes.
+</Warning>
